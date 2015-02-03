@@ -5,6 +5,11 @@
 //
 // It also sets up the connection from the command line parameters and a
 // password that it asks for from stdin (so it isn't echoed on screen)
+//
+//The flags are:
+//	'mysql-db'
+//	'mysql-host'
+//	'mysql-user'
 package bazaar
 
 import (
@@ -57,18 +62,21 @@ func Create() error {
 	return e
 }
 
+// Destroy calls the Destroy method on each banked vendor.
+// It also drops the database specified in the flag 'mysql-db'
 func Destroy() error {
 	var e error = nil
 	for _, v := range banked {
 		e = v.Destroy()
 		if e != nil { break; }
 	}
+		
+	_, e = con.Exec("DROP DATABASE " + db)
 	return e
 }
 
 const (
 	OK = iota
-	EOPARSE
 	EOMYSQL_PING
 	EOMYSQL_CREATE
 	EOMYSQL_USE
@@ -80,39 +88,43 @@ func init() {
 	flag.StringVar(&db, "mysql-db", "", "The 'MySQL Database' for the current sandbox")
 	flag.StringVar(&user, "mysql-user", "", "The mysql-user to build the database instance with")
 	flag.StringVar(&host, "mysql-host", "localhost:3306", "The mysql-host is the name of the server where MySQL lives. It can either be an IP or hostname followed by a port. (e.g. 127.0.01:3306)")
+}
 
-	flag.Parse()
-	if !flag.Parsed() { os.Exit(EOPARSE) }
-
+// Connects bazaar to the MySQL instance specified in the flags.
+// The reason why this is separated from the init func is so we can 
+// specify flags in other packages.
+//
+// This func requests a password from stdin and creates the db specified
+// in the flag 'mysql-db'
+func Connect() {
 	fmt.Fprint(os.Stderr, "MySQL Password: ")	
 	dsn = user + ":" + string(gopass.GetPasswd()) + "@tcp(" + host + ")/"
 
 	var e error = nil
 	con, e = OpenCox()
 	if e != nil { 
-		fmt.Fprintln(os.Stderr, "bazaar => MySQL " + e.Error())
+		fmt.Fprintln(os.Stderr, "bazaar.Connect => MySQL " + e.Error())
 		os.Exit(EOMYSQL_PING)
 	}
 
 	_, e = con.Exec("CREATE DATABASE IF NOT EXISTS " + db)
 	if e != nil {
-		fmt.Println(e.Error())
+		fmt.Println("bazaar.Connect => MySQL " + e.Error())
 		os.Exit(EOMYSQL_CREATE)
 	}
 
 	_, e = con.Exec("USE " + db)
 	if e != nil {
-		fmt.Println(e.Error())
+		fmt.Println("bazaar.Connect => MySQL " + e.Error())
 		os.Exit(EOMYSQL_USE)
 	}
-
 }
 
 // OpenCox returns us a DB connection, using the details we have stored in
 // the bazaar. It also returns an error if the Ping we do fails.
 func OpenCox() (*sql.DB, error) {
 	con, _ := sql.Open("mysql", dsn)
-	e := con.Ping();
+	e := con.Ping()
 	return con, e
 }
 
@@ -152,7 +164,7 @@ type Vendor struct {};
 
 // Create is the constructor for the Vendor's database. By calling
 // create it should be safe to assume that the required tables/resources
-// will be allocated by calling this.
+// will be allocated.
 //
 // The Vendor subtype will always return an error for this
 func (v *Vendor) Create() error {

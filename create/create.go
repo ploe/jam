@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"jam/bazaar"
 )
 
@@ -11,8 +13,12 @@ import (
 )
 
 func main() {
+	flag.Parse()
+	if !flag.Parsed() { os.Exit(1) }
+
+	bazaar.Connect()
+
 	e := bazaar.Create()
-	if e == nil {}
 	if e != nil {fmt.Println(e.Error())}
 }
 
