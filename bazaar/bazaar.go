@@ -109,13 +109,13 @@ func Connect() {
 
 	_, e = con.Exec("CREATE DATABASE IF NOT EXISTS " + db)
 	if e != nil {
-		fmt.Println("bazaar.Connect => MySQL " + e.Error())
+		fmt.Fprintln(os.Stderr, "bazaar.Connect => MySQL " + e.Error())
 		os.Exit(EOMYSQL_CREATE)
 	}
 
 	_, e = con.Exec("USE " + db)
 	if e != nil {
-		fmt.Println("bazaar.Connect => MySQL " + e.Error())
+		fmt.Fprintln(os.Stderr, "bazaar.Connect => MySQL " + e.Error())
 		os.Exit(EOMYSQL_USE)
 	}
 }
@@ -170,6 +170,7 @@ type Vendor struct {};
 func (v *Vendor) Create() error {
 	return errors.New("bazaar: 'Create' method undefined")
 }
+
 
 // Destroy is the destructor for the Vendor's database. Calling this 
 // should get rid of the tables and resources allocated by the vendor's

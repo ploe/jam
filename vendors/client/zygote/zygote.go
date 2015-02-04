@@ -2,6 +2,7 @@ package zygote
 
 import (
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -25,41 +26,86 @@ func digest(password, salt string) string {
 }
 
 func init() {
-	var z zygote
+	var z VendorsClientZygote
 	bazaar.Push(&z)
 }
 
-type zygote struct {
-	bazaar.Vendor
-}
-
+// type that represents a row of data in the client_zygote table
 type Data struct {
 	Name, Email, Password, Digest string
-	Created, Updated int64
+	ID, Created, Updated int64
 }
-
 
 // Adds a new client_zygote row to the table
 // If the Data has a password field we'll automatically suss out the SHA-1
 // digests for it.
-func Insert(d Data) error {
-	now := time.Now().Unix()
-	digest := digest(d.Password, strconv.FormatInt(now, 10))
+//
+// Checks to see if a user is registered with that name or email before,
+// slotting it in to the database.
+func (d Data) Insert() error {
+	var e error 
+	if found := ByEmail(d.Email); found != nil {
+		e = errors.New("zygote.Insert => Email '" + d.Email + "' already belongs to '" + found.Name + "'")
+	} else if found := ByName(d.Name); found != nil {
+		e = errors.New("zygote.Insert => Name '" + d.Name + "' already belongs to '" + found.Email + "'")
+	} else {
+		now := time.Now().Unix()
+		d.Digest = digest(d.Password, strconv.FormatInt(now, 10))
+	 	_, e = bazaar.Exec(`
+			INSERT INTO client_zygote (name, email, digest, created) 
+			VALUES (?, ?, ?, FROM_UNIXTIME(?))
+		`,  d.Name, d.Email, d.Digest, now)
+	}
+	return e	
+}
 
-	 _, e := bazaar.Exec(`
-		INSERT INTO client_zygote (name, email, digest, created) 
-		VALUES (?, ?, ?, FROM_UNIXTIME(?))
-	`,  d.Name, d.Email, digest, now)
+// Returns one zygote from the client_zygote table, as specified by the 
+// param email. The reason we only return one is because an email should
+// only be registered once.
+func ByEmail(email string) *Data {
+	return selectData("email", email)
+}
 
-	return e
+// Returns one zygote from the client_zygote table, as specified by the
+// param name. A name can not be shared across the db.
+func ByName(name string) *Data {
+	return selectData("name", name)
+}
+
+// Returns one zygote from the client_zygote table, as specified by the
+// param id, which is the primary key.
+func ByID(id uint64) *Data {
+	return selectData("id", id)
+}
+
+// Grabs us a row, with the specified attr set to val
+// If anything fails it returns nil
+func selectData(attr string, val interface{}) *Data {
+	rows, _ := bazaar.Query(`SELECT id, name, email, digest, UNIX_TIMESTAMP(created), UNIX_TIMESTAMP(updated) FROM client_zygote WHERE `+attr+`=?`, val)
+	defer rows.Close()
+
+	var d *Data = nil
+	if rows.Next() {
+		d = new(Data)
+		e := rows.Scan(&d.ID, &d.Name, &d.Email, &d.Digest, &d.Created, &d.Updated)
+		if e != nil { d = nil }
+	}
+	
+	return d
+}
+
+
+// Vendor interface, registered in the bazaar
+type VendorsClientZygote struct {
+	bazaar.Vendor
 }
 
 // - Creates the db table 'client_zygote'
 // - Adds indexes to its fields name and email
-func (v *zygote) Create() error {
+func (v *VendorsClientZygote) Create() error {
 	_, e := bazaar.Exec(`
 		CREATE TABLE IF NOT EXISTS client_zygote (
-			id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY, 
+			id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, 
 			name VARCHAR(50) NOT NULL,
 			email VARCHAR(50) NOT NULL,
 			digest VARCHAR(40),
@@ -72,17 +118,15 @@ func (v *zygote) Create() error {
 	return e
 }
 
-
-func (v *zygote) Destroy() error {
+func (v *VendorsClientZygote) Destroy() error {
 	_, e:= bazaar.Exec(`DROP TABLE client_zygote`)
 	return e
 }
 
-
-func (v *zygote) Name() string {
-	return "vendors/client/zygote"
+func (v *VendorsClientZygote) Name() string {
+	return "VendorsClientZygote"
 }
 
-func (v *zygote) Desc() string {
+func (v *VendorsClientZygote) Desc() string {
 	return `Common client data.`
 }
