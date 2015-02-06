@@ -20,11 +20,13 @@ type Obj struct {
 // attribute name and the value being the attribute value.
 func (o *Obj) Append(content, tag, post string, attr map[string]string) *Obj {
 	if tag != "" {
-		o.Body += "<" + tag + " "
+		o.Body += "<" + tag
 		for k, v := range attr {
-			o.Body += k + `="` + v + `" `		
+			o.Body += " " + k + `="` + v + `"`		
 		}
-		o.Body += post + ">"
+		if post != "" { o.Body += " " + post }
+		o.Body += ">"
+
 
 		if content != "" {
 			o.Body += content +	`</` + tag + `>`
@@ -51,9 +53,37 @@ func (o *Obj) Wrap(tag, post string, attr map[string]string) *Obj {
 	return o
 }
 
+// Generates a load of radio buttons in the body of the Obj. name is the
+// name of the http param, def is the default checked and attr is a bunch
+// of key value pairs; The key being the label and the value being what we
+// set the param to. The id is the name and key separated by an underscore.
+func (o *Obj) Radios(name, def string, attr map[string]string) *Obj {
+	for k, v := range attr {
+		id := name + "_" + k
+		var checked string
+		if def == k { checked = "checked" }
+		o.Append("", "INPUT", checked, map[string]string {
+			"id" : id,
+			"name" : name,
+			"type" : "radio",
+			"value" : v,
+		}).Append(k, "LABEL", "", map[string]string {
+			"for" : id,
+		}).Newline()
+	}
+	
+	return o
+}
+
 // Appends a newline to Obj's Body
 func (o *Obj) Newline() *Obj {
 	o.Body += "\n"
+
+	return o
+}
+
+func (o *Obj) BR() *Obj {
+        o.Body += "<BR>\n"
 
 	return o
 }
