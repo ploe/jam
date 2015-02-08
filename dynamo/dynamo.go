@@ -5,6 +5,10 @@
 // The package also provides a few helper functions in the same spirit!
 package dynamo
 
+import(
+	"sort"
+)
+
 // A dynamo Obj is a type used to build HTML elements using maps.
 // Doing it this way just seems tight and clean, and easily editable.
 // It's a little Perl-ish I admit, but I feel you need that sort of 
@@ -21,9 +25,12 @@ type Obj struct {
 func (o *Obj) Append(content, tag, post string, attr map[string]string) *Obj {
 	if tag != "" {
 		o.Body += "<" + tag
-		for k, v := range attr {
-			o.Body += " " + k + `="` + v + `"`		
+
+		keys := sortKeys(attr)
+		for _, v := range keys {
+			o.Body += " " + v + `="` + attr[v] + `"`		
 		}
+
 		if post != "" { o.Body += " " + post }
 		o.Body += ">"
 
@@ -58,7 +65,8 @@ func (o *Obj) Wrap(tag, post string, attr map[string]string) *Obj {
 // of key value pairs; The key being the label and the value being what we
 // set the param to. The id is the name and key separated by an underscore.
 func (o *Obj) Radios(name, def string, attr map[string]string) *Obj {
-	for k, v := range attr {
+	keys := sortKeys(attr)
+	for _, k := range keys {
 		id := name + "_" + k
 		var checked string
 		if def == k { checked = "checked" }
@@ -66,7 +74,7 @@ func (o *Obj) Radios(name, def string, attr map[string]string) *Obj {
 			"id" : id,
 			"name" : name,
 			"type" : "radio",
-			"value" : v,
+			"value" : attr[k],
 		}).Append(k, "LABEL", "", map[string]string {
 			"for" : id,
 		}).Newline()
@@ -90,4 +98,14 @@ func (o *Obj) BR() *Obj {
 
 func (o *Obj) String() string {
 	return o.Body
+}
+
+func sortKeys(attr map[string]string) []string {
+	keys := make([]string, 0, len(attr))
+	for k := range attr {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	return keys
 }
