@@ -2,7 +2,6 @@ package zygote
 
 import (
 	"crypto/sha1"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -39,23 +38,14 @@ type Data struct {
 // Adds a new client_zygote row to the table
 // If the Data has a password field we'll automatically suss out the SHA-1
 // digests for it.
-//
-// Checks to see if a user is registered with that name or email before,
-// slotting it in to the database.
 func (d Data) Insert() error {
-	var e error 
-	if found := ByEmail(d.Email); found != nil {
-		e = errors.New("zygote.Insert => Email '" + d.Email + "' already belongs to '" + found.Name + "'")
-	} else if found := ByName(d.Name); found != nil {
-		e = errors.New("zygote.Insert => Name '" + d.Name + "' already belongs to '" + found.Email + "'")
-	} else {
-		now := time.Now().Unix()
-		d.Digest = digest(d.Password, strconv.FormatInt(now, 10))
-	 	_, e = bazaar.Exec(`
-			INSERT INTO client_zygote (name, email, digest, created) 
-			VALUES (?, ?, ?, FROM_UNIXTIME(?))
-		`,  d.Name, d.Email, d.Digest, now)
-	}
+	now := time.Now().Unix()
+	d.Digest = digest(d.Password, strconv.FormatInt(now, 10))
+	_, e := bazaar.Exec(`
+		INSERT INTO client_zygote (name, email, digest, created) 
+		VALUES (?, ?, ?, FROM_UNIXTIME(?))
+	`,  d.Name, d.Email, d.Digest, now)
+
 	return e	
 }
 
